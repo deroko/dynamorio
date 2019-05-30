@@ -839,11 +839,11 @@ redirect_RtlPcToFileHeader(__in PVOID PcValue, __out PVOID *BaseOfImage)
 #endif
 
 typedef struct _FLS_GLOB_DATA {
-    RTL_BITMAP *redir_FlsBitmap;
-    LIST_ENTRY redir_FlsListHead;
-    PVOID *redir_FlsCallback;
-    ULONG redir_FlsHighIndex;
-    ULONG redir_FlsBitmapBits[5];
+    RTL_BITMAP *FlsBitmap;
+    LIST_ENTRY FlsListHead;
+    PVOID *FlsCallback;
+    ULONG FlsHighIndex;
+    ULONG FlsBitmapBits[5];
 } FLS_GLOB_DATA, *PFLS_GLOB_DATA;
 
 PFLS_GLOB_DATA redirFls;
@@ -860,17 +860,17 @@ ntdll_redir_fls_init(PEB *app_peb, PEB *private_peb)
 
     redirFls = HEAP_TYPE_ALLOC(GLOBAL_DCONTEXT, FLS_GLOB_DATA, ACCT_LIBDUP, UNPROTECTED);
 
-    redirFls->redir_FlsBitmap =
+    redirFls->FlsBitmap =
         HEAP_TYPE_ALLOC(GLOBAL_DCONTEXT, RTL_BITMAP, ACCT_LIBDUP, UNPROTECTED);
-    redirFls->redir_FlsBitmap->SizeOfBitMap = FLS_MAX_COUNT;
-    redirFls->redir_FlsBitmap->BitMapBuffer = (LPBYTE)&redirFls->redir_FlsBitmapBits;
-    redirFls->redir_FlsListHead.Flink = &redirFls->redir_FlsListHead;
-    redirFls->redir_FlsListHead.Blink = &redirFls->redir_FlsListHead;
-    redirFls->redir_FlsCallback = HEAP_ARRAY_ALLOC_MEMSET(
-        GLOBAL_DCONTEXT, PVOID, redirFls->redir_FlsBitmap->SizeOfBitMap, ACCT_LIBDUP,
+    redirFls->FlsBitmap->SizeOfBitMap = FLS_MAX_COUNT;
+    redirFls->FlsBitmap->BitMapBuffer = (LPBYTE)&redirFls->FlsBitmapBits;
+    redirFls->FlsListHead.Flink = &redirFls->FlsListHead;
+    redirFls->FlsListHead.Blink = &redirFls->FlsListHead;
+    redirFls->FlsCallback = HEAP_ARRAY_ALLOC_MEMSET(
+        GLOBAL_DCONTEXT, PVOID, redirFls->FlsBitmap->SizeOfBitMap, ACCT_LIBDUP,
         UNPROTECTED, 0);
-    redirFls->redir_FlsHighIndex = 0;
-    memset(redirFls->redir_FlsBitmapBits, 0, sizeof(redirFls->redir_FlsBitmapBits));
+    redirFls->FlsHighIndex = 0;
+    memset(redirFls->FlsBitmapBits, 0, sizeof(redirFls->FlsBitmapBits));
 }
 
 void
@@ -878,9 +878,9 @@ ntdll_redir_fls_exit(PEB *private_peb)
 {
     /* FLS is supported in WinXP-64 or later */
     ASSERT(get_os_version() >= WINDOWS_VERSION_2003);
-    HEAP_ARRAY_FREE(GLOBAL_DCONTEXT, redirFls->redir_FlsCallback, PVOID,
-                    redirFls->redir_FlsBitmap->SizeOfBitMap, ACCT_LIBDUP, UNPROTECTED);
-    HEAP_TYPE_FREE(GLOBAL_DCONTEXT, redirFls->redir_FlsBitmap, RTL_BITMAP, ACCT_LIBDUP,
+    HEAP_ARRAY_FREE(GLOBAL_DCONTEXT, redirFls->FlsCallback, PVOID,
+                    redirFls->FlsBitmap->SizeOfBitMap, ACCT_LIBDUP, UNPROTECTED);
+    HEAP_TYPE_FREE(GLOBAL_DCONTEXT, redirFls->FlsBitmap, RTL_BITMAP, ACCT_LIBDUP,
                    UNPROTECTED);
 }
 
@@ -900,19 +900,19 @@ redirect_RtlFlsAlloc(IN PFLS_CALLBACK_FUNCTION cb, OUT PDWORD index_out)
     if (!NT_SUCCESS(res))
         return res;
 
-    index = bitmap_find_free_sequence(redirFls->redir_FlsBitmap->BitMapBuffer,
-                                      redirFls->redir_FlsBitmap->SizeOfBitMap, 1,
+    index = bitmap_find_free_sequence(redirFls->FlsBitmap->BitMapBuffer,
+                                      redirFls->FlsBitmap->SizeOfBitMap, 1,
                                       false /*!top_down*/, 0, 0 /*no alignment*/);
     if (index < 0) {
         res = STATUS_NO_MEMORY; /* observed in real ntdll */
     } else {
         *index_out = index;
-        bitmap_mark_taken_sequence(redirFls->redir_FlsBitmap->BitMapBuffer,
-                                   redirFls->redir_FlsBitmap->SizeOfBitMap, index,
+        bitmap_mark_taken_sequence(redirFls->FlsBitmap->BitMapBuffer,
+                                   redirFls->FlsBitmap->SizeOfBitMap, index,
                                    index + 1);
-        if (index > redirFls->redir_FlsHighIndex)
-            redirFls->redir_FlsHighIndex = index;
-        redirFls->redir_FlsCallback[index] = (PVOID)cb;
+        if (index > redirFls->FlsHighIndex)
+            redirFls->FlsHighIndex = index;
+        redirFls->FlsCallback[index] = (PVOID)cb;
     }
 
     res = RtlLeaveCriticalSection(peb->FastPebLock);
@@ -931,23 +931,23 @@ redirect_RtlFlsFree(IN DWORD index)
     /* FLS is supported in WinXP-64 or later */
     ASSERT(get_os_version() >= WINDOWS_VERSION_2003);
 
-    if (index >= redirFls->redir_FlsBitmap->SizeOfBitMap)
+    if (index >= redirFls->FlsBitmap->SizeOfBitMap)
         return STATUS_INVALID_PARAMETER;
 
     res = RtlEnterCriticalSection(peb->FastPebLock);
     if (!NT_SUCCESS(res))
         return res;
 
-    bitmap_mark_freed_sequence(redirFls->redir_FlsBitmap->BitMapBuffer,
-                               redirFls->redir_FlsBitmap->SizeOfBitMap, index, 1);
+    bitmap_mark_freed_sequence(redirFls->FlsBitmap->BitMapBuffer,
+                               redirFls->FlsBitmap->SizeOfBitMap, index, 1);
     /* Call the cb, if the slot value is non-NULL */
-    if (redirFls->redir_FlsCallback[index] != NULL &&
+    if (redirFls->FlsCallback[index] != NULL &&
         teb->FlsData[index + TEB_FLS_DATA_OFFS] != NULL) {
         PFLS_CALLBACK_FUNCTION func = (PFLS_CALLBACK_FUNCTION)convert_data_to_function(
-            redirFls->redir_FlsCallback[index]);
+            redirFls->FlsCallback[index]);
         (*func)(teb->FlsData[index + TEB_FLS_DATA_OFFS]);
     }
-    redirFls->redir_FlsCallback[index] = NULL;
+    redirFls->FlsCallback[index] = NULL;
     /* Not bothering to figure out whether we can reduce peb->FlsHighIndex */
 
     res = RtlLeaveCriticalSection(peb->FastPebLock);
@@ -966,7 +966,7 @@ redirect_RtlProcessFlsData(IN PLIST_ENTRY fls_data)
      * If that changes we'll need to change TEB_FLS_DATA_OFFS.
      */
     size_t fls_data_sz =
-        sizeof(LIST_ENTRY) + sizeof(void *) * redirFls->redir_FlsBitmap->SizeOfBitMap;
+        sizeof(LIST_ENTRY) + sizeof(void *) * redirFls->FlsBitmap->SizeOfBitMap;
     /* FLS is supported in WinXP-64 or later */
     ASSERT(get_os_version() >= WINDOWS_VERSION_2003);
     if (fls_data == NULL) {
@@ -983,9 +983,9 @@ redirect_RtlProcessFlsData(IN PLIST_ENTRY fls_data)
          * doubly-linked circular list with a permanent head entry at
          * PEB.FlsListHead.
          */
-        tmp = redirFls->redir_FlsListHead.Blink;
-        redirFls->redir_FlsListHead.Blink = (PVOID)teb->FlsData;
-        ((LIST_ENTRY *)teb->FlsData)->Flink = &redirFls->redir_FlsListHead;
+        tmp = redirFls->FlsListHead.Blink;
+        redirFls->FlsListHead.Blink = (PVOID)teb->FlsData;
+        ((LIST_ENTRY *)teb->FlsData)->Flink = &redirFls->FlsListHead;
         ((LIST_ENTRY *)teb->FlsData)->Blink = tmp;
         tmp->Flink = (PVOID)teb->FlsData;
 
@@ -1000,13 +1000,13 @@ redirect_RtlProcessFlsData(IN PLIST_ENTRY fls_data)
          * redirect to call this routine for the first two.
          */
         uint i;
-        for (i = 0; i < redirFls->redir_FlsHighIndex; i++) {
+        for (i = 0; i < redirFls->FlsHighIndex; i++) {
             /* Only call it if the slot value is non-NULL */
-            if (redirFls->redir_FlsCallback[i] != NULL &&
+            if (redirFls->FlsCallback[i] != NULL &&
                 teb->FlsData[i + TEB_FLS_DATA_OFFS] != NULL) {
                 PFLS_CALLBACK_FUNCTION func =
                     (PFLS_CALLBACK_FUNCTION)convert_data_to_function(
-                        redirFls->redir_FlsCallback[i]);
+                        redirFls->FlsCallback[i]);
                 (*func)(((PPVOID)(fls_data + 1))[i]);
             }
         }
