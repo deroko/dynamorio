@@ -140,6 +140,8 @@ redirect_GetCurrentThreadId(VOID)
  * FLS
  */
 
+extern uint fls_tls_offset;
+
 DWORD WINAPI
 redirect_FlsAlloc(PFLS_CALLBACK_FUNCTION cb)
 {
@@ -169,11 +171,12 @@ PVOID WINAPI
 redirect_FlsGetValue(DWORD index)
 {
     TEB *teb = get_own_teb();
-    if (index >= FLS_MAX_COUNT || teb->FlsData == NULL) {
+    PREDIR_FLS pfls = (PREDIR_FLS)((ULONG_PTR)teb + fls_tls_offset);
+    if (index >= FLS_MAX_COUNT || pfls->FlsData == NULL) { // teb->FlsData == NULL) {
         set_last_error(ERROR_INVALID_PARAMETER);
         return NULL;
     } else {
-        return teb->FlsData[index + TEB_FLS_DATA_OFFS];
+        return pfls->FlsData[index + TEB_FLS_DATA_OFFS];
     }
 }
 
@@ -181,18 +184,19 @@ BOOL WINAPI
 redirect_FlsSetValue(DWORD index, PVOID value)
 {
     TEB *teb = get_own_teb();
+    PREDIR_FLS pfls = (PREDIR_FLS)((ULONG_PTR)teb + fls_tls_offset);
     if (index >= FLS_MAX_COUNT) {
         set_last_error(ERROR_INVALID_PARAMETER);
         return FALSE;
     }
-    if (teb->FlsData == NULL) {
+    if (pfls->FlsData == NULL) {
         NTSTATUS res = redirect_RtlProcessFlsData(0);
         if (!NT_SUCCESS(res)) {
             set_last_error(ntstatus_to_last_error(res));
             return FALSE;
         }
     }
-    teb->FlsData[index + TEB_FLS_DATA_OFFS] = value;
+    pfls->FlsData[index + TEB_FLS_DATA_OFFS] = value;
     return TRUE;
 }
 

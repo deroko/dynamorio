@@ -250,6 +250,10 @@ typedef struct _PEBLOCKROUTINE *PPEBLOCKROUTINE;
 typedef struct _PEB_FREE_BLOCK *PPEB_FREE_BLOCK;
 typedef PVOID *PPVOID;
 
+typedef struct _REDIR_FLS {
+    PPVOID FlsData;
+} REDIR_FLS, *PREDIR_FLS;
+
 typedef struct _RTL_BITMAP {
     ULONG SizeOfBitMap;  /* Number of bits in the bitmap */
     LPBYTE BitMapBuffer; /* Bitmap data, assumed sized to a DWORD boundary */
@@ -1630,10 +1634,10 @@ query_full_attributes_file(PCWSTR filename, PFILE_NETWORK_OPEN_INFORMATION info)
 #define FILE_ANY_ACCESS 0
 #define FILE_SPECIAL_ACCESS (FILE_ANY_ACCESS)
 #ifndef FILE_READ_ACCESS
-# define FILE_READ_ACCESS (0x0001)  // file & pipe
+#    define FILE_READ_ACCESS (0x0001) // file & pipe
 #endif
 #ifndef FILE_WRITE_ACCESS
-# define FILE_WRITE_ACCESS (0x0002) // file & pipe
+#    define FILE_WRITE_ACCESS (0x0002) // file & pipe
 #endif
 
 /* share flags, from ntddk.h, rest are in winnt.h */
