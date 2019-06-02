@@ -395,7 +395,7 @@ function (add_asm_target source output_out tgt_out extra_suffix extra_defs extra
     # this stage, thus we add include paths by hand as it is done in 
     # core/CMakeLists.txt. This fixes invalid include paths for 
     # asm_defines.asm when compiling with VS2013
-    # OSNAME is not existins at this stage from core/CMakeLists.txt thus
+    # OSNAME is not existing at this stage from core/CMakeLists.txt thus
     # we will hardcode it to win32, as this path we reach only in case
     # of Windows VS builds.
     
