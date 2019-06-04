@@ -890,6 +890,28 @@ ntdll_redir_fls_exit(PEB *private_peb)
                    UNPROTECTED);
 }
 
+void
+ntdll_redir_fls_thread_exit(PPVOID fls_data_ptr)
+{
+    PEB *peb = IF_CLIENT_INTERFACE_ELSE(get_private_peb(), get_peb(NT_CURRENT_PROCESS));
+    LIST_ENTRY *fls_data;
+    NTSTATUS   res;
+    if (fls_data_ptr == NULL)
+        return;
+
+    res = RtlEnterCriticalSection(peb->FastPebLock);
+    if (!NT_SUCCESS(res))
+        return;
+
+    fls_data = (LIST_ENTRY *)fls_data_ptr;
+
+    fls_data->Flink->Blink = fls_data->Blink;
+    fls_data->Blink->Flink = fls_data->Flink;
+
+    RtlLeaveCriticalSection(peb->FastPebLock);
+    return;
+}
+
 NTSTATUS NTAPI
 redirect_RtlFlsAlloc(IN PFLS_CALLBACK_FUNCTION cb, OUT PDWORD index_out)
 {

@@ -61,4 +61,6 @@ ntdll_redir_fls_init(PEB *app_peb, PEB *private_peb);
 void
 ntdll_redir_fls_exit(PEB *private_peb);
 
+void
+ntdll_redir_fls_thread_exit(PPVOID fls_data);
 #endif /* _DRWINAPI_H_ */
