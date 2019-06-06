@@ -1128,6 +1128,10 @@ endif (BUILD_TESTS)
 
 # Do not put core/ into the include dirs as our link.h will conflict
 # with /usr/include/link.h!
+
+# XXX i#3613: If a new include directory is added or old one removed, it has to 
+# be updated also in make/cpp2asm_support.cmake for "VisualStudio" in function
+# add_asm_target to allow proper preprocessing of ASM files in case of VS builds
 include_directories(BEFORE
   ${CMAKE_CURRENT_SOURCE_DIR}/lib
   ${CMAKE_CURRENT_SOURCE_DIR}/arch

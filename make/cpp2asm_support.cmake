@@ -388,7 +388,17 @@ function (add_asm_target source output_out tgt_out extra_suffix extra_defs extra
     set(output_stamp "${output}.stamp")
     set_property(SOURCE "${output}" PROPERTY GENERATED true)
     set(output_tgt generate_${srcbase}${extra_suffix})
-
+    
+    # XXX i#3613: When using VS2013 build, preprocessing is done with
+    # wrong include paths set. Unfortunatelly, there is no easy way to get
+    # include paths at this point. INCLUDE_DIRECTORIES is not set yet at 
+    # this stage, thus we add include paths by hand as it is done in 
+    # core/CMakeLists.txt. This fixes invalid include paths for 
+    # asm_defines.asm when compiling with VS2013
+    # OSNAME is not existing at this stage from core/CMakeLists.txt thus
+    # we will hardcode it to win32, as this path we reach only in case
+    # of Windows VS builds.
+    
     add_custom_command(OUTPUT "${output_stamp}"
       DEPENDS
         "${source}"
@@ -397,6 +407,12 @@ function (add_asm_target source output_out tgt_out extra_suffix extra_defs extra
       COMMAND ${CMAKE_COMMAND}
         ARGS -E touch "${output_stamp}"
       COMMAND "${CMAKE_C_COMPILER}" ARGS ${CMAKE_CPP_FLAGS}
+        -DCPP2ASM
+        /I${CMAKE_CURRENT_SOURCE_DIR}/lib
+        /I${CMAKE_CURRENT_SOURCE_DIR}/arch
+        /I${CMAKE_CURRENT_SOURCE_DIR}/win32 # ${OSNAME} is not defined at this stage
+        /I${CMAKE_CURRENT_SOURCE_DIR}/arch/${ARCH_NAME}
+        /I${CMAKE_CURRENT_SOURCE_DIR}/drlibc
         /I "${PROJECT_BINARY_DIR}" ${extra_defs}
         -E ${CPP_NO_LINENUM} "${source}"
         ">" "${s_file}"
